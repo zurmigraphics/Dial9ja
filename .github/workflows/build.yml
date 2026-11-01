@@ -1,0 +1,53 @@
+name: Build Dial9ja APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack project
+        run: |
+          mkdir -p build-src
+          unzip -q Dial9ja.zip -d build-src
+          SETTINGS=$(find build-src -name settings.gradle.kts | head -n 1)
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+          cache-disabled: true
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Prepare APK
+        run: cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" Dial9ja.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dial9ja-apk
+          path: Dial9ja.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Dial9ja build ${{ github.run_number }}
+          files: Dial9ja.apk
+          prerelease: true
